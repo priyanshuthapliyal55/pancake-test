@@ -97,7 +97,7 @@ txn = construct_txn.build_transaction({
 
 # Sign and send
 signed_txn = w3.eth.account.sign_transaction(txn, deployer.key)
-tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
 
 print(f"   TX: {tx_hash.hex()}")
 print(f"   ⏳ Waiting for confirmation...")
