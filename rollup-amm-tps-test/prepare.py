@@ -134,11 +134,12 @@ class Preparer:
         for account in accounts:
             self.transfer_eth(account.address, 0.25)
 
-    def start(self):
+    def start(self, skip_funding=False):
         # logger.info(f'[{self.account.address}] Balance: {self.w3.eth.get_balance(self.account.address) / 1e18}')
         # logger.info(f'[{self.account.address}] WETH Balance: {self.weth.functions.balanceOf(self.account.address).call() / 1e18}')
-        # 1. Fund all accounts:
-        self.fund_accounts()
+        # 1. Fund all accounts (only funder should do this):
+        if not skip_funding:
+            self.fund_accounts()
         # 2. Each account has to wrap enough WETH for swaps (each swap requires 1e-9 WETH)
         self.wrap_eth(1e-6)
         # 3. Each account has to approve WETH spending to SMART_ROUTER
@@ -189,9 +190,9 @@ class Preparer:
             self.waiting_thread.join()
 
 
-def run_in_parallel(objects):
+def run_in_parallel(objects, skip_funding=False):
     def start_and_wait(obj):
-        obj.start()
+        obj.start(skip_funding=skip_funding)
         obj.wait()
         return "Done"
     global EXECUTION_STARTED
@@ -212,12 +213,16 @@ if __name__ == "__main__":
     Account.enable_unaudited_hdwallet_features()
     funder = Account.from_mnemonic(mnemonic, account_path="m/44'/60'/0'/0/0")
     accounts = generate_ethereum_accounts(mnemonic, count=NUM_ACCOUNTS)
-    # 1. Fund all accounts:
-    # objects = [Preparer(ChainId.MY_CUSTOM_L2, funder)]
-    # 2. Each account has to wrap enough WETH for swaps (each swap requires 1e-9 WETH)
-    # 3. Each account has to approve WETH spending to SMART_ROUTER
-    # 4. Check readiness
+    
+    logger.info("=" * 70)
+    logger.info("PHASE 1: Funder sends ETH to all 100 accounts")
+    logger.info("=" * 70)
+    # Phase 1: Only funder (account 0) funds all accounts
+    run_in_parallel([Preparer(ChainId.MY_CUSTOM_L2, funder)], skip_funding=False)
+    
+    logger.info("=" * 70)
+    logger.info("PHASE 2: All accounts wrap ETH and approve router")
+    logger.info("=" * 70)
+    # Phase 2: All accounts wrap WETH and approve (skip funding step)
     objects = [Preparer(ChainId.MY_CUSTOM_L2, account) for account in accounts]
-
-    # Execute in parallel:
-    run_in_parallel(objects)
+    run_in_parallel(objects, skip_funding=True)
