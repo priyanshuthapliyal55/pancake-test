@@ -73,8 +73,14 @@ input("\n✅ Press Enter to start deployment...")
 # CONTRACT ABIS AND BYTECODE
 # =============================================================================
 
-# Simplified WETH9 ABI and Bytecode
-WETH9_ABI = [
+# Load compiled WETH contract
+with open('out/WETH.sol/WETH.json', 'r') as f:
+    weth_json = json.load(f)
+    WETH9_BYTECODE = weth_json['bytecode']['object']
+    WETH9_ABI = weth_json['abi']
+
+# Fallback WETH9 ABI if needed
+WETH9_ABI_FALLBACK = [
     {"constant": True, "inputs": [], "name": "name", "outputs": [{"name": "", "type": "string"}], "type": "function"},
     {"constant": True, "inputs": [], "name": "symbol", "outputs": [{"name": "", "type": "string"}], "type": "function"},
     {"constant": True, "inputs": [], "name": "decimals", "outputs": [{"name": "", "type": "uint8"}], "type": "function"},
@@ -86,8 +92,6 @@ WETH9_ABI = [
     {"inputs": [], "payable": False, "stateMutability": "nonpayable", "type": "constructor"},
     {"payable": True, "stateMutability": "payable", "type": "fallback"}
 ]
-
-WETH9_BYTECODE = "0x60806040526040518060400160405280600b81526020017f5772617070656420424e420000000000000000000000000000000000000000008152506000908051906020019061004f929190610062565b5060006001555034801561006257600080fd5b50610107565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106100a357805160ff19168380011785556100d1565b828001600101855582156100d1579182015b828111156100d05782518255916020019190600101906100b5565b5b5090506100de91906100e2565b5090565b61010491905b808211156101005760008160009055506001016100e8565b5090565b90565b6107e6806101166000396000f3fe6080604052600436106100555760003560e01c8063095ea7b31461005a57806318160ddd146100c757806323b872dd146100f25780632e1a7d4d14610185578063313ce567146101c057806370a08231146101ee57806395d89b4114610253578063a9059cbb146102e3578063d0e30db014610356578063dd62ed3e14610360575b600080fd5b34801561006657600080fd5b506100ad6004803603604081101561007d57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803590602001909291905050506103e5565b604051808215151515815260200191505060405180910390f35b3480156100d357600080fd5b506100dc6104d7565b6040518082815260200191505060405180910390f35b3480156100fe57600080fd5b5061016b6004803603606081101561011557600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803590602001909291905050506104dd565b604051808215151515815260200191505060405180910390f35b34801561019157600080fd5b506101be600480360360208110156101a857600080fd5b8101908080359060200190929190505050610748565b005b3480156101cc57600080fd5b506101d5610850565b604051808260ff1660ff16815260200191505060405180910390f35b3480156101fa57600080fd5b5061023d6004803603602081101561021157600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610855565b6040518082815260200191505060405180910390f35b34801561025f57600080fd5b5061026861086d565b6040518080602001828103825283818151815260200191508051906020019080838360005b838110156102a857808201518184015260208101905061028d565b50505050905090810190601f1680156102d55780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b3480156102ef57600080fd5b5061033c6004803603604081101561030657600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff1690602001909291908035906020019092919050505061090b565b604051808215151515815260200191505060405180910390f35b61035e61091f565b005b34801561036c57600080fd5b506103cf6004803603604081101561038357600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190803573ffffffffffffffffffffffffffffffffffffffff16906020019092919050505061098e565b6040518082815260200191505060405180910390f35b600081600360003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040518082815260200191505060405180910390a36001905092915050565b60015490565b60008060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054821115151561052c57600080fd5b600360008573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020016000205482111515156105b757600080fd5b816000808673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825401925050819055506106588260008086815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020546109b390919063ffffffff16565b60008085815260200190815260200160002060003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055508273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef846040518082815260200191505060405180910390a3600190509392505050565b806000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054101515156107b5576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252602b8152602001807f5772617070656420424e423a20696e73756666696369656e742062616c616e6381526020017f6520666f72207769746864726177616c00000000000000000000000000000000815250604001915050600a09150fd5b806000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825403925050819055503373ffffffffffffffffffffffffffffffffffffffff166108fc829081150290604051600060405180830381858888f1935050505015801561084d573d6000803e3d6000fd5b50565b601290565b60026020528060005260406000206000915090505481565b60008054600181600116156101000203166002900480601f0160208091040260200160405190810160405280929190818152602001828054600181600116156101000203166002900480156109035780601f106108d857610100808354040283529160200191610903565b820191906000526020600020905b8154815290600101906020018083116108e657829003601f168201915b505050505081565b60006109183384846104dd565b9050929150505056fea265627a7a723158202d9f5f61f6f0e5d7cf6c3e6e9e5e9c5e8e6e0f5e5e9e7e7e7e7e7e7e7e7e7e7e64736f6c634300050c0032"
 
 # Simple ERC20 Token (for CAKE) - Simplified version
 SIMPLE_ERC20_ABI = [
@@ -141,7 +145,7 @@ def deploy_contract(contract_name, abi, bytecode, constructor_args=None, value=0
     
     # Sign and send
     signed_txn = w3.eth.account.sign_transaction(txn, deployer.key)
-    tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
     
     print(f"   TX: {tx_hash.hex()}")
     print(f"   ⏳ Waiting for confirmation...")
@@ -171,7 +175,7 @@ def send_transaction(contract, function_name, *args, value=0):
     })
     
     signed_txn = w3.eth.account.sign_transaction(txn, deployer.key)
-    tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
     
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
     
@@ -204,11 +208,11 @@ print("\n" + "=" * 70)
 print("STEP 2: Deploy PancakeFactory")
 print("=" * 70)
 
-# Load factory bytecode from compiled contracts
-factory_path = Path("../pancake-swap-core/build/contracts/PancakeFactory.json")
+# Load factory bytecode from compiled contracts (Foundry output)
+factory_path = Path("../pancake-swap-core/build/PancakeFactory.sol/PancakeFactory.json")
 if not factory_path.exists():
     print("❌ PancakeFactory.json not found!")
-    print("   Run: cd ../pancake-swap-core && npm install && npx truffle compile")
+    print("   Run: cd ../pancake-swap-core && forge build --force")
     exit(1)
 
 with open(factory_path) as f:
@@ -229,10 +233,10 @@ print("\n" + "=" * 70)
 print("STEP 3: Deploy PancakeRouter")
 print("=" * 70)
 
-router_path = Path("../pancake-swap-periphery/build/contracts/PancakeRouter.json")
+router_path = Path("../pancake-swap-periphery/build/PancakeRouter.sol/PancakeRouter.json")
 if not router_path.exists():
     print("❌ PancakeRouter.json not found!")
-    print("   Run: cd ../pancake-swap-periphery && npm install && npx truffle compile")
+    print("   Run: cd ../pancake-swap-periphery && forge build --force")
     exit(1)
 
 with open(router_path) as f:
@@ -253,25 +257,32 @@ print("\n" + "=" * 70)
 print("STEP 4: Deploy CAKE Test Token")
 print("=" * 70)
 
-# For simplicity, using a basic ERC20. In production, compile CAKEToken.sol
-# Here's a minimal ERC20 bytecode - you can replace with compiled CAKEToken
-print("   Note: Using simplified ERC20 token")
-print("   For production, compile and use CAKEToken.sol")
-
-cake_path = Path("../build/tokens/CAKEToken.sol")
-# We'll need to compile this properly
-print(f"   ⚠️  To deploy proper CAKE token, compile {cake_path}")
-print(f"   For now, please deploy CAKE token manually or compile CAKEToken.sol")
-print(f"   ")
-print(f"   Quick option: Use Remix IDE to deploy CAKEToken.sol")
-
-# Placeholder - user needs to provide this
-cake_address = input("\n   Enter deployed CAKE token address (or press Enter to skip): ").strip()
-if cake_address and cake_address.startswith('0x'):
+# Load compiled CAKE token
+cake_path = Path("out/CAKEToken.sol/CAKEToken.json")
+if cake_path.exists():
+    print("   Loading compiled CAKE token...")
+    with open(cake_path) as f:
+        cake_artifact = json.load(f)
+    
+    cake_address = deploy_contract(
+        "CAKEToken",
+        cake_artifact['abi'],
+        cake_artifact['bytecode']['object'],
+        constructor_args=[]
+    )
     deployed_addresses['CAKE'] = cake_address
+    print(f"   ✅ CAKE Token deployed successfully!")
 else:
-    print("   ⚠️  Skipping CAKE deployment - you'll need to deploy it separately")
-    deployed_addresses['CAKE'] = "0x0000000000000000000000000000000000000000"
+    print("   ⚠️  CAKEToken.json not found in out/ directory")
+    print("   Compile it with: forge build CAKEToken.sol --use 0.5.16 --evm-version istanbul")
+    cake_address = input("\n   Enter deployed CAKE token address (or press Enter to skip): ").strip()
+    if cake_address and cake_address.startswith('0x'):
+        deployed_addresses['CAKE'] = cake_address
+    else:
+        print("   ⚠️  Skipping CAKE deployment - you'll need to deploy it separately")
+        deployed_addresses['CAKE'] = "0x0000000000000000000000000000000000000000"
+
+time.sleep(2)
 
 
 # Step 5: Create Pair and Add Liquidity (if CAKE is deployed)
