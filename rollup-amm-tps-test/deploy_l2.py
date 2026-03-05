@@ -165,10 +165,25 @@ def send_transaction(contract, function_name, *args, value=0):
     print(f"   📤 Calling {function_name}...")
     
     func = getattr(contract.functions, function_name)
+    
+    # Try to estimate gas first to catch reverts early
+    try:
+        gas_estimate = func(*args).estimate_gas({
+            'from': deployer_address,
+            'value': value
+        })
+        gas_limit = min(int(gas_estimate * 1.5), MAX_GAS)
+        print(f"   ⛽ Estimated gas: {gas_estimate}")
+    except Exception as e:
+        print(f"   ⚠️  Gas estimation failed: {str(e)[:200]}")
+        print(f"   This usually means the transaction will revert.")
+        print(f"   Attempting anyway with max gas...")
+        gas_limit = MAX_GAS
+    
     txn = func(*args).build_transaction({
         'from': deployer_address,
         'nonce': w3.eth.get_transaction_count(deployer_address),
-        'gas': MAX_GAS,
+        'gas': gas_limit,
         'gasPrice': w3.to_wei(GAS_PRICE_GWEI, 'gwei'),
         'chainId': L2_CHAIN_ID,
         'value': value
@@ -184,7 +199,8 @@ def send_transaction(contract, function_name, *args, value=0):
         return receipt
     else:
         print(f"   ❌ Transaction failed!")
-        exit(1)
+        print(f"   Gas used: {receipt['gasUsed']} / {gas_limit}")
+        return None
 
 
 # =============================================================================
@@ -314,42 +330,58 @@ if deployed_addresses['CAKE'] != "0x0000000000000000000000000000000000000000":
     print("STEP 5: Create Pair and Add Liquidity")
     print("=" * 70)
     
-    factory_contract = w3.eth.contract(address=factory_address, abi=factory_artifact['abi'])
-    router_contract = w3.eth.contract(address=router_address, abi=router_artifact['abi'])
-    cake_contract = w3.eth.contract(address=deployed_addresses['CAKE'], abi=SIMPLE_ERC20_ABI)
-    
-    # Create pair
-    print("\n   Creating WETH/CAKE pair...")
-    send_transaction(factory_contract, 'createPair', weth_address, deployed_addresses['CAKE'])
-    
-    # Get pair address
-    pair_address = factory_contract.functions.getPair(weth_address, deployed_addresses['CAKE']).call()
-    print(f"   ✅ Pair created at: {pair_address}")
-    deployed_addresses['WETH_CAKE_PAIR'] = pair_address
-    
-    # Approve router to spend CAKE
-    cake_amount = w3.to_wei(INITIAL_CAKE_LIQUIDITY, 'ether')
-    print(f"\n   Approving router to spend {INITIAL_CAKE_LIQUIDITY} CAKE...")
-    send_transaction(cake_contract, 'approve', router_address, cake_amount)
-    
-    # Add liquidity
-    eth_amount = w3.to_wei(INITIAL_ETH_LIQUIDITY, 'ether')
-    deadline = int(time.time()) + 3600  # 1 hour from now
-    
-    print(f"\n   Adding liquidity: {INITIAL_ETH_LIQUIDITY} ETH + {INITIAL_CAKE_LIQUIDITY} CAKE...")
-    send_transaction(
-        router_contract,
-        'addLiquidityETH',
-        deployed_addresses['CAKE'],  # token
-        cake_amount,  # amountTokenDesired
-        0,  # amountTokenMin
-        0,  # amountETHMin
-        deployer_address,  # to
-        deadline,  # deadline
-        value=eth_amount
-    )
-    
-    print("   ✅ Liquidity added successfully!")
+    try:
+        factory_contract = w3.eth.contract(address=factory_address, abi=factory_artifact['abi'])
+        router_contract = w3.eth.contract(address=router_address, abi=router_artifact['abi'])
+        cake_contract = w3.eth.contract(address=deployed_addresses['CAKE'], abi=SIMPLE_ERC20_ABI)
+        
+        # Create pair
+        print("\n   Creating WETH/CAKE pair...")
+        result = send_transaction(factory_contract, 'createPair', weth_address, deployed_addresses['CAKE'])
+        
+        if result is None:
+            print("   ⚠️  Failed to create pair - it may already exist")
+        
+        # Get pair address
+        pair_address = factory_contract.functions.getPair(weth_address, deployed_addresses['CAKE']).call()
+        print(f"   ✅ Pair exists at: {pair_address}")
+        deployed_addresses['WETH_CAKE_PAIR'] = pair_address
+        
+        # Approve router to spend CAKE
+        cake_amount = w3.to_wei(INITIAL_CAKE_LIQUIDITY, 'ether')
+        print(f"\n   Approving router to spend {INITIAL_CAKE_LIQUIDITY} CAKE...")
+        result = send_transaction(cake_contract, 'approve', router_address, cake_amount)
+        
+        if result is None:
+            raise Exception("Failed to approve CAKE")
+        
+        # Add liquidity
+        eth_amount = w3.to_wei(INITIAL_ETH_LIQUIDITY, 'ether')
+        deadline = int(time.time()) + 3600  # 1 hour from now
+        
+        print(f"\n   Adding liquidity: {INITIAL_ETH_LIQUIDITY} ETH + {INITIAL_CAKE_LIQUIDITY} CAKE...")
+        result = send_transaction(
+            router_contract,
+            'addLiquidityETH',
+            deployed_addresses['CAKE'],  # token
+            cake_amount,  # amountTokenDesired
+            0,  # amountTokenMin
+            0,  # amountETHMin
+            deployer_address,  # to
+            deadline,  # deadline
+            value=eth_amount
+        )
+        
+        if result:
+            print("   ✅ Liquidity added successfully!")
+        else:
+            print("   ⚠️  Liquidity addition failed")
+            print("   You can add it manually later using the Router contract")
+            
+    except Exception as e:
+        print(f"\n   ⚠️  Liquidity setup encountered an error: {e}")
+        print("   Continuing with deployment - you can add liquidity manually later")
+
 
 
 # =============================================================================
