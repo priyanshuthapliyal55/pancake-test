@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Load configuration
 L2_RPC_URL = "http://localhost:8545"
-L2_CHAIN_ID =  
+L2_CHAIN_ID =  1376
 
 w3 = Web3(Web3.HTTPProvider(L2_RPC_URL))
 

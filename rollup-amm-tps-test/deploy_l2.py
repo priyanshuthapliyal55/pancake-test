@@ -25,8 +25,8 @@ GAS_PRICE_GWEI = 0.001  # Adjust based on your L2
 MAX_GAS = 8000000
 
 # Liquidity amounts (adjust as needed)
-INITIAL_ETH_LIQUIDITY = 0.5  # ETH to add to pool
-INITIAL_CAKE_LIQUIDITY = 1000  # CAKE tokens to add to pool
+INITIAL_ETH_LIQUIDITY = 0.1  # ETH to add to pool
+INITIAL_CAKE_LIQUIDITY = 100  # CAKE tokens to add to pool
 
 # =============================================================================
 # SETUP
