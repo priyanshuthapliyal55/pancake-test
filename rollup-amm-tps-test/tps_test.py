@@ -155,7 +155,7 @@ class Trader:
                     await self._send_transaction(ws, signed_tx, nonce)
 
     async def _send_transaction(self, ws, signed_tx, nonce):
-        json_request = request_to_json("eth_sendRawTransaction", [signed_tx.raw_transaction.hex()], request_id=self.request_id)
+        json_request = request_to_json("eth_sendRawTransaction", ["0x" + signed_tx.raw_transaction.hex()], request_id=self.request_id)
         await ws.send(json.dumps(json_request))
         tx_hash = signed_tx.hash.hex()
         logger.info(f"[{self.account.address}] Tx request sent (swap): {tx_hash} | nonce={nonce} | id={self.request_id}")
