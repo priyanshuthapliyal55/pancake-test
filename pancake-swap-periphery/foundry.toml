@@ -1,0 +1,14 @@
+[profile.default]
+src = 'contracts'
+out = 'build'
+libs = []
+solc_version = '0.6.6'
+optimizer = true
+optimizer_runs = 999999
+via_ir = false
+allow_paths = ['../pancake-swap-core']
+
+remappings = [
+    '@uniswap/v2-core/contracts/=../pancake-swap-core/contracts/',
+    '@uniswap/lib/contracts/libraries/=contracts/libraries/'
+]

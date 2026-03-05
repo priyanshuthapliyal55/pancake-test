@@ -1,0 +1,9 @@
+[profile.default]
+src = 'contracts'
+out = 'build'
+libs = []
+solc_version = '0.5.16'
+evm_version = 'istanbul'
+optimizer = true
+optimizer_runs = 999999
+via_ir = false
