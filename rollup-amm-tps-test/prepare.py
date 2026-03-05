@@ -213,11 +213,11 @@ if __name__ == "__main__":
     funder = Account.from_mnemonic(mnemonic, account_path="m/44'/60'/0'/0/0")
     accounts = generate_ethereum_accounts(mnemonic, count=NUM_ACCOUNTS)
     # 1. Fund all accounts:
-    objects = [Preparer(ChainId.SEPOLIA_TESTNET, funder)]
+    objects = [Preparer(ChainId.MY_CUSTOM_L2, funder)]
     # 2. Each account has to wrap enough WETH for swaps (each swap requires 1e-9 WETH)
     # 3. Each account has to approve WETH spending to SMART_ROUTER
     # 4. Check readiness
-    # objects = [Preparer(ChainId.SEPOLIA_TESTNET, account) for account in accounts]
+    # objects = [Preparer(ChainId.MY_CUSTOM_L2, account) for account in accounts]
 
     # Execute in parallel:
     run_in_parallel(objects)

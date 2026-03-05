@@ -10,8 +10,7 @@ class ChainId(enum.Enum):
     POLYGON_ZKEVM_MAINNET = 1101
     ZKSYNC_ERA_MAINNET = 324
     SEPOLIA_TESTNET = 11155111
-    # Add your custom L2 here:
-    # MY_L2 = your_chain_id  # Example: 12345
+    MY_CUSTOM_L2 = 1376  # Your custom L2
 
 
 class Contract(enum.Enum):
@@ -79,17 +78,16 @@ class BlockchainData:
                 Token.WETH: '0x6e881c585748cbAab9bB366ae7b87832F973f8c5',
             },
         ),
-        # Uncomment and configure for your custom L2:
-        # ChainId.MY_L2: NetworkData(
-        #     chain_id=12345,  # Your chain ID
-        #     http_rpc_url='https://your-l2-rpc-url',
-        #     ws_rpc_url='wss://your-l2-ws-url',
-        #     addresses={
-        #         Contract.PANCAKE_SMART_ROUTER: '0xYourRouterAddress',
-        #         Token.CAKE: '0xYourTokenAddress',
-        #         Token.WETH: '0xYourWETHAddress',
-        #     },
-        # ),
+        ChainId.MY_CUSTOM_L2: NetworkData(
+            chain_id=ChainId.MY_CUSTOM_L2.value,
+            http_rpc_url='http://localhost:8545',
+            ws_rpc_url='ws://localhost:8546',
+            addresses={
+                Contract.PANCAKE_SMART_ROUTER: '0x28D5ff4521c4cfBFb809C8Ff83295dB63ea63Eed',  # Will be updated after Router redeploy
+                Token.CAKE: '0xc4FB722766823B9daf6C8E3E67F17a2c5b72cca8',
+                Token.WETH: '0x82f4814125D7784DADF412096343ee364Ce6666d',
+            },
+        ),
     }
 
     def __init__(self, chain_id: ChainId):

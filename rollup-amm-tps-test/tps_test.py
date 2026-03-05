@@ -204,7 +204,7 @@ if __name__ == "__main__":
     start_index = 10 * trader_index
     accounts = generate_ethereum_accounts(mnemonic, count=100)[start_index:start_index+10]
     # Change ChainId here to test different networks
-    objects = [Trader(ChainId.SEPOLIA_TESTNET, account, swap_txs_count=200) for account in accounts]
+    objects = [Trader(ChainId.MY_CUSTOM_L2, account, swap_txs_count=200) for account in accounts]
     # Execute in parallel:
     wait_until_target_time()  # All terminals sync to next 5-min mark
     run_in_parallel(objects)
