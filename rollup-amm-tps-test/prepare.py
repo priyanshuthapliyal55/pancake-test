@@ -88,7 +88,7 @@ class Preparer:
             'nonce': self.nonce,
         }
         signed_tx = self.w3.eth.account.sign_transaction(tx, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         logger.info(f"[{self.account.address}] Tx sent (transfer_eth): {tx_hash.hex()} | nonce={self.nonce}")
         self.pending_tx_hashes.append(tx_hash.hex())
         self.nonce += 1
@@ -105,7 +105,7 @@ class Preparer:
             'nonce': self.nonce,
         })
         signed_tx = self.w3.eth.account.sign_transaction(tx, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         logger.info(f"[{self.account.address}] Tx sent (wrap): {tx_hash.hex()} | nonce={self.nonce}")
         self.pending_tx_hashes.append(tx_hash.hex())
         self.nonce += 1
@@ -122,7 +122,7 @@ class Preparer:
             'nonce': self.nonce,
         })
         signed_tx = self.w3.eth.account.sign_transaction(tx, self.account.key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         logger.info(f"[{self.account.address}] Tx sent (approve): {tx_hash.hex()} | nonce={self.nonce}")
         self.pending_tx_hashes.append(tx_hash.hex())
         self.nonce += 1
