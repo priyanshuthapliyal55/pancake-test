@@ -76,7 +76,7 @@ input("\n✅ Press Enter to start deployment...")
 # Load compiled WETH contract
 with open('out/WETH.sol/WETH.json', 'r') as f:
     weth_json = json.load(f)
-    WETH9_BYTECODE = weth_json['bytecode']['object']
+    WETH9_BYTECODE = weth_json['bytecode']['object'] if isinstance(weth_json['bytecode'], dict) else weth_json['bytecode']
     WETH9_ABI = weth_json['abi']
 
 # Fallback WETH9 ABI if needed
@@ -218,10 +218,15 @@ if not factory_path.exists():
 with open(factory_path) as f:
     factory_artifact = json.load(f)
 
+# Extract bytecode properly from Foundry format
+factory_bytecode = factory_artifact['bytecode']
+if isinstance(factory_bytecode, dict):
+    factory_bytecode = factory_bytecode['object']
+
 factory_address = deploy_contract(
     "PancakeFactory",
     factory_artifact['abi'],
-    factory_artifact['bytecode'],
+    factory_bytecode,
     constructor_args=[deployer_address]
 )
 deployed_addresses['Factory'] = factory_address
@@ -242,10 +247,15 @@ if not router_path.exists():
 with open(router_path) as f:
     router_artifact = json.load(f)
 
+# Extract bytecode properly from Foundry format
+router_bytecode = router_artifact['bytecode']
+if isinstance(router_bytecode, dict):
+    router_bytecode = router_bytecode['object']
+
 router_address = deploy_contract(
     "PancakeRouter",
     router_artifact['abi'],
-    router_artifact['bytecode'],
+    router_bytecode,
     constructor_args=[factory_address, weth_address]
 )
 deployed_addresses['Router'] = router_address
