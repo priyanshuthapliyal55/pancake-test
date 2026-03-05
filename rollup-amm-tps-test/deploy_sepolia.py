@@ -29,7 +29,7 @@ def deploy_contract(w3, account, bytecode, abi, constructor_args=[]):
     
     # Sign and send
     signed = account.sign_transaction(deploy_tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     print(f"Deployment tx: {tx_hash.hex()}")
     
     # Wait for receipt
