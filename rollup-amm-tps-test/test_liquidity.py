@@ -23,7 +23,7 @@ addresses = config['addresses']
 w3 = Web3(Web3.HTTPProvider(L2_RPC_URL))
 
 # Load deployer account
-with open('../mnemonic.txt') as f:
+with open('mnemonic.txt') as f:
     mnemonic = f.read().strip()
 
 Account.enable_unaudited_hdwallet_features()
