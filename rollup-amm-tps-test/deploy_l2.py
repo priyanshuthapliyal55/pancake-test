@@ -16,8 +16,8 @@ from pathlib import Path
 # =============================================================================
 
 # Your L2 Configuration
-L2_RPC_URL = "http://46.165.235.105:8545"  # Change this
-L2_CHAIN_ID = 11155111  # Change this to your L2 chain ID
+L2_RPC_URL = "http://localhost:8545"  # Change this
+L2_CHAIN_ID = 1376  # Change this to your L2 chain ID
 L2_NAME = "MY_L2"  # Change this to your L2 name
 
 # Gas settings (adjust for your L2)
@@ -239,26 +239,39 @@ print("STEP 3: Deploy PancakeRouter")
 print("=" * 70)
 
 router_path = Path("../pancake-swap-periphery/build/PancakeRouter.sol/PancakeRouter.json")
-if not router_path.exists():
-    print("❌ PancakeRouter.json not found!")
-    print("   Run: cd ../pancake-swap-periphery && forge build --force")
-    exit(1)
+if router_path.exists():
+    print("   Loading compiled PancakeRouter...")
+    with open(router_path) as f:
+        router_artifact = json.load(f)
 
-with open(router_path) as f:
-    router_artifact = json.load(f)
+    # Extract bytecode properly from Foundry format
+    router_bytecode = router_artifact['bytecode']
+    if isinstance(router_bytecode, dict):
+        router_bytecode = router_bytecode['object']
 
-# Extract bytecode properly from Foundry format
-router_bytecode = router_artifact['bytecode']
-if isinstance(router_bytecode, dict):
-    router_bytecode = router_bytecode['object']
+    router_address = deploy_contract(
+        "PancakeRouter",
+        router_artifact['abi'],
+        router_bytecode,
+        constructor_args=[factory_address, weth_address]
+    )
+    deployed_addresses['Router'] = router_address
+else:
+    print("   ⚠️  PancakeRouter.json not found!")
+    print("   The periphery contracts have compilation issues with imports.")
+    print("   ")
+    print("   Option 1: Deploy Router manually using Remix IDE")
+    print("   Option 2: Use existing Router if re-deploying")
+    print("   ")
+    router_address = input("   Enter PancakeRouter address (or press Enter to skip): ").strip()
+    if router_address and router_address.startswith('0x'):
+        deployed_addresses['Router'] = router_address
+        print(f"   ✅ Using Router at: {router_address}")
+    else:
+        print("   ⚠️  Skipping Router deployment - you'll need to deploy it separately")
+        print("   ❌ Cannot continue without Router. Exiting...")
+        exit(1)
 
-router_address = deploy_contract(
-    "PancakeRouter",
-    router_artifact['abi'],
-    router_bytecode,
-    constructor_args=[factory_address, weth_address]
-)
-deployed_addresses['Router'] = router_address
 time.sleep(2)
 
 
