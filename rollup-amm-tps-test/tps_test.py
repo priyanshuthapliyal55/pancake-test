@@ -76,7 +76,8 @@ class Trader:
         self.swap_txs_count = swap_txs_count
         # Initialize web3:
         self.blockchain = BlockchainData(chain_id)
-        self.w3 = Web3(Web3.WebsocketProvider(self.blockchain.ws_rpc_url()))
+        # Use HTTP provider for initial setup (getting nonce)
+        self.w3 = Web3(Web3.HTTPProvider(self.blockchain.http_rpc_url()))
         self.nonce = self.w3.eth.get_transaction_count(account.address)
         self.chain_id = chain_id.value
         self.cake_address = self.blockchain.get_address(Token.CAKE)
