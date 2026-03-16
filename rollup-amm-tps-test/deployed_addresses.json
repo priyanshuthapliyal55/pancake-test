@@ -1,7 +1,7 @@
 {
   "network": "MY_L2",
   "chain_id": 11155111,
-  "rpc_url": "http://46.165.235.105:8545",
+  "rpc_url": "https://eth-sepolia.rpcmanager.zeeve.net/75z9g86fuof7mm2p690g/rpc",
   "addresses": {
     "WETH": "0x6e881c585748cbAab9bB366ae7b87832F973f8c5",
     "Factory": "0x84141fcDA62C498B96c6c20267D68459DCADA55A",
@@ -9,5 +9,7 @@
   },
   "deployer": "0x45a4bB1037364785ab5DAa3082249c9c21E79dD8",
   "CAKE": "0x9Dc3bFe767CeCD81F97B5ed7f1df640F6876CE62",
-  "Pair_WETH_CAKE": "0x7fEa22C180828f55e7271bD9747C1227D1811C64"
+  "Pair_WETH_CAKE": "0x7fEa22C180828f55e7271bD9747C1227D1811C64",
+  "JPMD_PROXY": "0x84141fcDA62C498B96c6c20267D68459DCADA55A",
+  "JPMD_IMPLEMENTATION": "0x6e881c585748cbAab9bB366ae7b87832F973f8c5"
 }

@@ -71,9 +71,9 @@ def retriable(method):
 
 
 class Trader:
-    def __init__(self, chain_id: ChainId, account: Account, swap_txs_count=None):
+    def __init__(self, chain_id: ChainId, account: Account, transfer_txs_count=None, token_address=None, recipient_address=None, transfer_amount=None):
         self.account = account
-        self.swap_txs_count = swap_txs_count
+        self.transfer_txs_count = transfer_txs_count
         # Initialize web3:
         self.blockchain = BlockchainData(chain_id)
         # Use HTTP provider for initial setup (getting nonce)
@@ -81,9 +81,25 @@ class Trader:
         # Get nonce including pending transactions to avoid nonce conflicts
         self.nonce = self.w3.eth.get_transaction_count(account.address, 'pending')
         self.chain_id = chain_id.value
-        self.cake_address = self.blockchain.get_address(Token.CAKE)
-        self.weth_address = self.blockchain.get_address(Token.WETH)
-        self.smart_router_address = self.blockchain.get_address(Contract.PANCAKE_SMART_ROUTER)
+        
+        # Token configuration - use provided token or default to CAKE
+        if token_address:
+            self.token_address = token_address
+        else:
+            self.token_address = self.blockchain.get_address(Token.CAKE)
+        
+        # Recipient configuration - if not provided, send to self
+        if recipient_address:
+            self.recipient_address = recipient_address
+        else:
+            self.recipient_address = account.address
+            
+        # Transfer amount - default to 1000 wei (1e-15 tokens for 18 decimal tokens)
+        if transfer_amount:
+            self.transfer_amount = transfer_amount
+        else:
+            self.transfer_amount = 1000  # 1000 wei = 0.000000000000001 tokens
+        
         # Initialize gas price:
         self.gas_price = 2 * self.w3.eth.gas_price
         # Initialize variables:
@@ -95,18 +111,26 @@ class Trader:
         # Prefill signed txs:
         self.prefill_signed_txs()
 
-    def swap_v2_prefill(self):
-        # Swap 1e-9 WETH for CAKE using swapExactTokensForTokens:
-        # With deadline parameter (5 billion seconds from epoch = year 2128)
-        calldata = f"0x38ed1739000000000000000000000000000000000000000000000000000000003b9aca00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000{self.account.address.lower()[2:]}000000000000000000000000000000000000000000000000000000012a05f2000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000{self.weth_address.lower()[2:]}000000000000000000000000{self.cake_address.lower()[2:]}"
+    def transfer_prefill(self):
+        """
+        Create a token transfer transaction.
+        ERC20 transfer function signature: transfer(address to, uint256 amount)
+        Function selector: 0xa9059cbb
+        """
+        # Encode the transfer calldata:
+        # Function selector (4 bytes) + recipient address (32 bytes, left-padded) + amount (32 bytes)
+        recipient_padded = self.recipient_address.lower()[2:].zfill(64)  # Remove 0x and pad to 32 bytes
+        amount_hex = hex(self.transfer_amount)[2:].zfill(64)  # Convert to hex and pad to 32 bytes
+        calldata = f"0xa9059cbb{recipient_padded}{amount_hex}"
+        
         tx = {
             'value': 0,
             'chainId': self.chain_id,
             'from': self.account.address,
-            'gas': 250000,
+            'gas': 100000,  # Token transfers typically need ~65k gas, using 100k for safety
             'gasPrice': self.gas_price,
             'nonce': self.nonce,
-            'to': self.smart_router_address,
+            'to': self.token_address,
             'data': calldata,
         }
         signed_tx = Account.sign_transaction(tx, self.account.key)
@@ -115,8 +139,8 @@ class Trader:
         return True
 
     def prefill_signed_txs(self):
-        for _ in range(self.swap_txs_count):
-            self.swap_v2_prefill()
+        for _ in range(self.transfer_txs_count):
+            self.transfer_prefill()
 
     def start(self):
         logger.info(f'[{self.account.address}] Starting...')
@@ -164,7 +188,7 @@ class Trader:
                             if nonce in self.signed_txs_by_nonce:
                                 tx_hash = self.signed_txs_by_nonce[nonce].hash.hex()
                                 del self.signed_txs_by_nonce[nonce]
-                                logger.info(f"[{self.account.address}] Tx request accepted (swap): {tx_hash} | nonce={nonce} | id={request_id}")
+                                logger.info(f"[{self.account.address}] Tx request accepted (transfer): {tx_hash} | nonce={nonce} | id={request_id}")
                         else:
                             # Error: RPC didn't accept transaction
                             logger.info(f"[{self.account.address}] Recv: {message}")
@@ -207,13 +231,13 @@ class Trader:
                     raise
 
     async def _send_transaction(self, ws, signed_tx, nonce):
-        json_request = request_to_json("eth_sendRawTransaction", ["0x" + signed_tx.raw_transaction.hex()], request_id=self.request_id)
+        json_request = request_to_json("eth_sendRawTransaction", ["0x" + signed_tx.rawTransaction.hex()], request_id=self.request_id)
         send_time = time.time()
         await ws.send(json.dumps(json_request))
         tx_hash = signed_tx.hash.hex()
         # Record send timestamp for latency tracking
         self.tx_send_timestamps[tx_hash] = send_time
-        logger.info(f"[{self.account.address}] Tx request sent (swap): {tx_hash} | nonce={nonce} | id={self.request_id}")
+        logger.info(f"[{self.account.address}] Tx request sent (transfer): {tx_hash} | nonce={nonce} | id={self.request_id}")
         self.nonce_by_request_id[self.request_id] = nonce
         self.request_id += 1
 
@@ -261,17 +285,35 @@ def wait_until_target_time():
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
-    # Parse -n argument:
+    # Parse arguments:
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', type=int, required=True, help='index of trader')
+    parser.add_argument('--token', type=str, help='Token contract address (default: CAKE from deployed_addresses.json)')
+    parser.add_argument('--recipient', type=str, help='Recipient address (default: send to self)')
+    parser.add_argument('--amount', type=int, help='Transfer amount in wei (default: 1000)')
+    parser.add_argument('--txs', type=int, default=200, help='Number of transactions per account (default: 200)')
     args = parser.parse_args()
+    
     trader_index = args.n
+    
     # Initialize accounts:
     mnemonic = open("mnemonic.txt", "r").read().strip()
     start_index = 10 * trader_index
     accounts = generate_ethereum_accounts(mnemonic, count=100)[start_index:start_index+10]
+    
     # Change ChainId here to test different networks
-    objects = [Trader(ChainId.MY_CUSTOM_L2, account, swap_txs_count=200) for account in accounts]
+    objects = [
+        Trader(
+            ChainId.MY_CUSTOM_L2, 
+            account, 
+            transfer_txs_count=args.txs,
+            token_address=args.token,
+            recipient_address=args.recipient,
+            transfer_amount=args.amount
+        ) 
+        for account in accounts
+    ]
+    
     # Execute in parallel:
     wait_until_target_time()  # All terminals sync to next 5-min mark
     run_in_parallel(objects)
