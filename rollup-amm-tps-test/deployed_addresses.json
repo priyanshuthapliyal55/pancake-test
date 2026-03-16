@@ -1,7 +1,7 @@
 {
   "network": "MY_L2",
   "chain_id": 11155111,
-  "rpc_url": "https://eth-sepolia.rpcmanager.zeeve.net/75z9g86fuof7mm2p690g/rpc",
+  "rpc_url": "http://46.165.235.105:8545",
   "addresses": {
     "WETH": "0x6e881c585748cbAab9bB366ae7b87832F973f8c5",
     "Factory": "0x84141fcDA62C498B96c6c20267D68459DCADA55A",

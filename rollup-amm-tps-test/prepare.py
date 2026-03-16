@@ -66,7 +66,8 @@ class Preparer:
         self.blockchain = BlockchainData(chain_id)
         self.chain_id = chain_id.value
         self.w3 = Web3(Web3.HTTPProvider(self.blockchain.http_rpc_url()))
-        self.nonce = self.w3.eth.get_transaction_count(account.address)
+        # Get pending nonce to avoid conflicts with previous transactions
+        self.nonce = self.w3.eth.get_transaction_count(account.address, 'pending')
         weth_address = self.blockchain.get_address(Token.WETH)
         self.weth = self.w3.eth.contract(address=weth_address, abi=WETH_ABI)
         # Initialize variables:
@@ -129,7 +130,7 @@ class Preparer:
         return True
 
     def fund_accounts(self):
-        mnemonic = open("mnemonic.txt", "r").read()
+        mnemonic = open("mnemonic.txt", "r").read().strip()
         accounts = generate_ethereum_accounts(mnemonic, NUM_ACCOUNTS)
         for account in accounts:
             self.transfer_eth(account.address, 0.25)

@@ -101,7 +101,7 @@ def main():
         })
         
         signed_tx1 = deployer.sign_transaction(tx1)
-        tx1_hash = w3.eth.send_raw_transaction(signed_tx1.rawTransaction)
+        tx1_hash = w3.eth.send_raw_transaction(signed_tx1.raw_transaction)
         print(f"   TX: {tx1_hash.hex()}")
         print(f"   ⏳ Waiting for confirmation...")
         
@@ -116,10 +116,9 @@ def main():
         # Step 2: Prepare initialization data
         print("🔧 Step 2/3: Preparing initialization data...")
         token = w3.eth.contract(address=impl_address, abi=token_abi)
-        init_data = token.encodeABI(
-            fn_name='initialize',
-            args=[token_name, token_symbol, initial_supply, admin]
-        )
+        init_data = token.functions.initialize(
+            token_name, token_symbol, initial_supply, admin
+        ).build_transaction({'from': deployer.address, 'gas': 0})['data']
         print(f"   ✅ Init data prepared ({len(init_data)} bytes)\n")
         
         # Step 3: Deploy proxy
@@ -134,7 +133,7 @@ def main():
         })
         
         signed_tx2 = deployer.sign_transaction(tx2)
-        tx2_hash = w3.eth.send_raw_transaction(signed_tx2.rawTransaction)
+        tx2_hash = w3.eth.send_raw_transaction(signed_tx2.raw_transaction)
         print(f"   TX: {tx2_hash.hex()}")
         print(f"   ⏳ Waiting for confirmation...")
         

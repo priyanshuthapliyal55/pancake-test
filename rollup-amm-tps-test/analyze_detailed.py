@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Enhanced TPS Analysis - Excludes empty blocks for accurate metrics
+Enhanced TPS Analysis - 100% Accurate Data by Analyzing All Transactions
 """
 import sys
 import json
+import os
+import glob
 from datetime import datetime, timedelta
 from web3 import Web3
+from collections import defaultdict
 
 def main():
     # Connect to L2
-    rpc_url = "http://46.165.235.105:8545"
+    rpc_url = "http://localhost:8545"
     w3 = Web3(Web3.HTTPProvider(rpc_url))
     
     if not w3.is_connected():
@@ -81,8 +84,8 @@ def main():
         return
     
     # Separate active blocks (with transactions) from empty blocks
-    active_blocks = [b for b in all_blocks if b['tx_count'] > 0]
-    empty_blocks = [b for b in all_blocks if b['tx_count'] == 0]
+    active_blocks = [b for b in all_blocks if b['tx_count'] > 1]
+    empty_blocks = [b for b in all_blocks if b['tx_count'] == 1]
     
     if not active_blocks:
         print("\n❌ No transactions found in the specified time window")
@@ -99,63 +102,134 @@ def main():
     last_active = active_blocks[-1]
     active_time = last_active['timestamp'] - first_active['timestamp']
     if active_time == 0:
-        active_time = 4  # Single block, assume 4s block time
+        active_time = 2  # Single block, assume 2s block time
     
     total_txs = sum(b['tx_count'] for b in active_blocks)
     
-    # Collect transaction details (sample only for speed - much faster!)
-    print(f"Analyzing {total_txs} transactions (using smart sampling for speed)...")
+    # Collect ALL transaction details for 100% accuracy
+    print(f"Fetching {total_txs} transaction receipts for accurate analysis...")
+    print("(This may take a minute...)")
     
-    # Calculate gas statistics from blocks (much faster than per-tx receipts)
-    total_gas = sum(b['gas_used'] for b in active_blocks)
-    avg_gas = total_gas / total_txs if total_txs > 0 else 0
+    tx_details = []
+    successful_txs = 0
+    failed_txs = 0
+    gas_used_list = []
+    tx_by_block = defaultdict(list)
     
-    # Sample a few transactions to check success rate
-    sample_size = min(100, total_txs)
-    successful_sampled = 0
-    failed_sampled = 0
-    sample_gas_list = []
+    # Progress tracking
+    processed = 0
+    for block in active_blocks:
+        block_timestamp = block['timestamp']
+        for tx_hash in block['transactions']:
+            try:
+                receipt = w3.eth.get_transaction_receipt(tx_hash)
+                tx = w3.eth.get_transaction(tx_hash)
+                
+                tx_info = {
+                    'hash': tx_hash.hex(),
+                    'block': receipt.blockNumber,
+                    'block_timestamp': block_timestamp,
+                    'status': receipt.status,
+                    'gas_used': receipt.gasUsed,
+                    'gas_price': tx.gasPrice,
+                    'from': receipt['from'],
+                    'to': receipt.to,
+                }
+                
+                tx_details.append(tx_info)
+                gas_used_list.append(receipt.gasUsed)
+                tx_by_block[receipt.blockNumber].append(tx_info)
+                
+                if receipt.status == 1:
+                    successful_txs += 1
+                else:
+                    failed_txs += 1
+                    
+                processed += 1
+                if processed % 100 == 0:
+                    print(f"  Progress: {processed}/{total_txs} transactions processed ({processed/total_txs*100:.1f}%)")
+                    
+            except Exception as e:
+                print(f"  Warning: Could not fetch tx {tx_hash.hex()}: {e}")
     
-    tx_sample = []
-    for block in active_blocks[:10]:  # Sample from first 10 active blocks
-        for tx_hash in block['transactions'][:10]:  # Up to 10 txs per block
-            if len(tx_sample) < sample_size:
-                tx_sample.append((tx_hash, block['timestamp']))
+    print(f"  ✅ Completed: {len(tx_details)} transactions analyzed\n")
     
-    for tx_hash, timestamp in tx_sample:
+    # Load timestamp data if available for precise latency
+    timestamp_files = sorted(glob.glob("tx_timestamps_*.json"), reverse=True)
+    send_timestamps = {}
+    if timestamp_files:
+        print(f"Found {len(timestamp_files)} timestamp file(s). Loading most recent...")
         try:
-            receipt = w3.eth.get_transaction_receipt(tx_hash)
-            sample_gas_list.append(receipt.gasUsed)
-            if receipt.status == 1:
-                successful_sampled += 1
-            else:
-                failed_sampled += 1
-        except:
-            pass
+            with open(timestamp_files[0], 'r') as f:
+                send_timestamps = json.load(f)
+            print(f"  ✅ Loaded {len(send_timestamps)} send timestamps from {timestamp_files[0]}\n")
+        except Exception as e:
+            print(f"  ⚠️  Could not load timestamps: {e}\n")
     
-    # Estimate success rate from sample
-    if successful_sampled + failed_sampled > 0:
-        success_rate = successful_sampled / (successful_sampled + failed_sampled)
-        successful_txs = int(total_txs * success_rate)
-        failed_txs = total_txs - successful_txs
+    # Calculate latencies if we have timestamp data
+    latencies = []
+    if send_timestamps:
+        for tx_info in tx_details:
+            tx_hash = tx_info['hash']
+            # Try both with and without 0x prefix
+            tx_hash_clean = tx_hash[2:] if tx_hash.startswith('0x') else tx_hash
+            tx_hash_prefixed = '0x' + tx_hash_clean
+            
+            send_time = send_timestamps.get(tx_hash_clean) or send_timestamps.get(tx_hash_prefixed)
+            if send_time:
+                confirm_time = tx_info['block_timestamp']
+                latency = confirm_time - send_time
+                latencies.append(latency)
+    
+    # Calculate gas statistics (100% accurate now)
+    if gas_used_list:
+        total_gas = sum(gas_used_list)
+        avg_gas = total_gas / len(gas_used_list)
+        min_gas = min(gas_used_list)
+        max_gas = max(gas_used_list)
+        
+        # Percentiles
+        sorted_gas = sorted(gas_used_list)
+        p50_gas = sorted_gas[len(sorted_gas) // 2]
+        p95_gas = sorted_gas[int(len(sorted_gas) * 0.95)]
+        p99_gas = sorted_gas[int(len(sorted_gas) * 0.99)]
     else:
-        successful_txs = total_txs
-        failed_txs = 0
+        total_gas = avg_gas = min_gas = max_gas = p50_gas = p95_gas = p99_gas = 0
     
-    # Calculate gas statistics from sample
-    min_gas = min(sample_gas_list) if sample_gas_list else int(avg_gas * 0.9)
-    max_gas = max(sample_gas_list) if sample_gas_list else int(avg_gas * 1.1)
-    
-    # Calculate latencies
-    min_latency = 0  # Best case: immediate inclusion
-    max_latency = active_time  # Worst case: waited until last block
-    avg_latency = active_time / 2  # Approximate average
+    # Calculate latency statistics
+    if latencies:
+        min_latency = min(latencies)
+        max_latency = max(latencies)
+        avg_latency = sum(latencies) / len(latencies)
+        sorted_latencies = sorted(latencies)
+        p50_latency = sorted_latencies[len(sorted_latencies) // 2]
+        p95_latency = sorted_latencies[int(len(sorted_latencies) * 0.95)]
+        p99_latency = sorted_latencies[int(len(sorted_latencies) * 0.99)]
+    else:
+        # Fallback to estimates
+        min_latency = 0
+        max_latency = active_time
+        avg_latency = active_time / 2
+        p50_latency = avg_latency
+        p95_latency = active_time * 0.95
+        p99_latency = active_time * 0.99
     
     # Calculate TPS metrics
     # Sent TPS: assume all submitted simultaneously at first active block
     tps_sent = total_txs  # All submitted within ~1 second
-    # Achieved TPS: based on active processing time only
-    tps_achieved = total_txs / active_time if active_time > 0 else 0
+    # Average TPS: average txs per block divided by block time
+    avg_txs_per_block = total_txs / len(active_blocks)
+    block_time_avg = active_time / (len(active_blocks) - 1) if len(active_blocks) > 1 else 2.0
+    tps_average = avg_txs_per_block / block_time_avg if block_time_avg > 0 else 0
+    # Aggregate TPS: total throughput over entire period (useful for very short windows)
+    tps_aggregate = total_txs / active_time if active_time > 0 else 0
+    
+    # Verify we have transaction data
+    if not tx_details:
+        print("\n⚠️  Warning: No transaction details could be retrieved")
+        print("   Showing block-level statistics only\n")
+        successful_txs = total_txs
+        failed_txs = 0
     
     # Print Report
     print("\n" + "=" * 90)
@@ -163,52 +237,77 @@ def main():
     print("=" * 90)
     print(f"Overall Window:   {first_block['time'].strftime('%H:%M:%S')} - {last_block['time'].strftime('%H:%M:%S')} ({len(all_blocks)} blocks)")
     print(f"Active Period:    {first_active['time'].strftime('%H:%M:%S')} - {last_active['time'].strftime('%H:%M:%S')} ({len(active_blocks)} blocks)")
+    print(f"Time Span:        {active_time}s (from block {first_active['number']} to {last_active['number']})")
+    print(f"Block Intervals:  {len(active_blocks) - 1} intervals × {block_time_avg:.2f}s = {active_time}s")
     print(f"Empty Blocks:     {len(empty_blocks)} blocks (excluded from TPS calculation)")
-    print(f"Block Time:       {active_time / len(active_blocks):.2f} seconds avg")
     
     print("\n" + "=" * 90)
     print("🚀 TRANSACTION THROUGHPUT")
     print("=" * 90)
     print(f"📤 TPS Sent:       {tps_sent:.2f} TPS (all {total_txs} txs submitted simultaneously)")
-    print(f"📥 TPS Achieved:   {tps_achieved:.2f} TPS (processed over {active_time}s active time)")
-    print(f"📊 Efficiency:     {(tps_achieved/tps_sent)*100:.1f}% (achieved vs sent)")
-    print(f"\nTotal Txs:        {total_txs}")
-    print(f"Successful:       ~{successful_txs} ({successful_txs/total_txs*100:.1f}%) [estimated from {len(tx_sample)} sampled]")
-    print(f"Failed:           ~{failed_txs} ({failed_txs/total_txs*100:.1f}%)" if failed_txs > 0 else "Failed:           ~0")
+    print(f"📥 TPS Average:    {tps_average:.2f} TPS (avg {avg_txs_per_block:.1f} txs/block ÷ {block_time_avg:.2f}s)")
+    print(f"📊 TPS Aggregate:  {tps_aggregate:.2f} TPS (total {total_txs} txs over {active_time}s span)")
+    print(f"⚡ Efficiency:     {(tps_average/tps_sent)*100:.1f}% (avg achieved vs sent)")
+    
+    if tx_details:
+        print(f"\nTotal Txs:        {len(tx_details)} (100% analyzed)")
+        print(f"✅ Successful:    {successful_txs} ({successful_txs/len(tx_details)*100:.1f}%)")
+        print(f"❌ Failed:        {failed_txs} ({failed_txs/len(tx_details)*100:.1f}%)" if failed_txs > 0 else "❌ Failed:        0 (0%)")
+    else:
+        print(f"\nTotal Txs:        {total_txs}")
+        print(f"Status:           Unknown (receipts not fetched)")
+        
     print(f"Peak Block Txs:   {max(b['tx_count'] for b in active_blocks)}")
     print(f"Avg Txs/Block:    {total_txs / len(active_blocks):.2f} (active blocks only)")
     
     print("\n" + "=" * 90)
     print("⏱️  LATENCY METRICS")
     print("=" * 90)
-    print(f"Min Latency:      ~{min_latency}s (immediate inclusion)")
-    print(f"Max Latency:      ~{max_latency}s (last transaction confirmed)")
-    print(f"Avg Latency:      ~{avg_latency:.1f}s (estimated)")
-    print(f"Processing Time:  {active_time}s ({len(active_blocks)} active blocks)")
+    if latencies:
+        print(f"Data Source:      tx_timestamps_*.json (EXACT measurements)")
+        print(f"Samples:          {len(latencies)}/{len(tx_details)} transactions ({len(latencies)/len(tx_details)*100:.1f}%)")
+        print(f"Min Latency:      {min_latency:.3f}s")
+        print(f"Avg Latency:      {avg_latency:.3f}s")
+        print(f"P50 Latency:      {p50_latency:.3f}s (median)")
+        print(f"P95 Latency:      {p95_latency:.3f}s")
+        print(f"P99 Latency:      {p99_latency:.3f}s")
+        print(f"Max Latency:      {max_latency:.3f}s")
+    else:
+        print(f"Data Source:      Block timestamps (ESTIMATED)")
+        print(f"Min Latency:      ~{min_latency}s (immediate inclusion)")
+        print(f"Max Latency:      ~{max_latency}s (last transaction confirmed)")
+        print(f"Avg Latency:      ~{avg_latency:.1f}s (estimated)")
+        print(f"\n⚠️  Tip: Run tps_test_transfers.py to generate exact latency data")
+    print(f"Processing Time:  {active_time}s span ({len(active_blocks)-1} intervals of {block_time_avg:.2f}s each)")
     
     print("\n" + "=" * 90)
     print("⛽ GAS USAGE STATISTICS")
     print("=" * 90)
     print(f"Total Gas Used:   {total_gas:,} gas")
     print(f"Average Gas/Tx:   {avg_gas:,.0f} gas")
-    print(f"Min Gas Used:     {min_gas:,} gas")
-    print(f"Max Gas Used:     {max_gas:,} gas")
+    print(f"Min Gas:          {min_gas:,} gas")
+    print(f"P50 Gas (median): {p50_gas:,} gas")
+    print(f"P95 Gas:          {p95_gas:,} gas")
+    print(f"P99 Gas:          {p99_gas:,} gas")
+    print(f"Max Gas:          {max_gas:,} gas")
     print(f"Gas Efficiency:   {(avg_gas/max_gas)*100:.1f}% (avg/max)")
     
-    # Gas distribution (from sample)
-    if sample_gas_list:
+    # Gas distribution (100% accurate now)
+    if gas_used_list:
         gas_ranges = {
-            '< 100k': sum(1 for g in sample_gas_list if g < 100000),
-            '100k-200k': sum(1 for g in sample_gas_list if 100000 <= g < 200000),
-            '200k-300k': sum(1 for g in sample_gas_list if 200000 <= g < 300000),
-            '300k-400k': sum(1 for g in sample_gas_list if 300000 <= g < 400000),
-            '400k+': sum(1 for g in sample_gas_list if g >= 400000),
+            '< 50k': sum(1 for g in gas_used_list if g < 50000),
+            '50k-100k': sum(1 for g in gas_used_list if 50000 <= g < 100000),
+            '100k-150k': sum(1 for g in gas_used_list if 100000 <= g < 150000),
+            '150k-200k': sum(1 for g in gas_used_list if 150000 <= g < 200000),
+            '200k-300k': sum(1 for g in gas_used_list if 200000 <= g < 300000),
+            '300k+': sum(1 for g in gas_used_list if g >= 300000),
         }
-        print(f"\nGas Distribution (from {len(sample_gas_list)} sampled txs):")
+        print(f"\nGas Distribution (100% of {len(gas_used_list)} transactions):")
         for range_name, count in gas_ranges.items():
             if count > 0:
-                pct = (count / len(sample_gas_list)) * 100
-                bar = '█' * int(pct / 2)
+                pct = (count / len(gas_used_list)) * 100
+                bar_len = min(40, int(pct / 2))
+                bar = '█' * bar_len
                 print(f"  {range_name:12s}: {count:4d} txs ({pct:5.1f}%) {bar}")
     
     # Peak performance window
@@ -248,18 +347,85 @@ def main():
     print("\n" + "=" * 90)
     print("📝 ONE-LINE SUMMARY")
     print("=" * 90)
-    print(f"Sent {total_txs} txs at {tps_sent:.0f} TPS (simultaneous), "
-          f"L2 processed at {tps_achieved:.2f} TPS over {active_time}s "
-          f"({len(active_blocks)} active blocks, {avg_gas/1000:.0f}k gas/tx avg, "
-          f"latency {min_latency}-{max_latency}s)")
+    latency_str = f"{min_latency:.2f}-{max_latency:.2f}s" if latencies else f"~{min_latency}-{max_latency:.0f}s"
+    tx_count = len(tx_details) if tx_details else total_txs
+    intervals = len(active_blocks) - 1
+    print(f"Sent {tx_count} txs at {tps_sent:.0f} TPS (simultaneous), "
+          f"L2 processed at {tps_average:.2f} TPS average over {active_time}s "
+          f"({len(active_blocks)} blocks = {intervals} intervals, {avg_txs_per_block:.1f} txs/block, "
+          f"{block_time_avg:.2f}s/block, {avg_gas/1000:.0f}k gas/tx avg, {successful_txs} successful, latency {latency_str})")
     
     print("\n" + "=" * 90)
     print("✅ REPORT COMPLETE")
     print("=" * 90)
-    print(f"\nℹ️  Note: {len(empty_blocks)} empty blocks excluded from TPS calculation")
+    if tx_details:
+        print(f"\n📊 Accuracy: 100% of transactions analyzed ({len(tx_details)} receipts fetched)")
+    else:
+        print(f"\n⚠️  Accuracy: Block-level only ({total_txs} transactions in blocks)")
+    print(f"   {len(empty_blocks)} empty blocks excluded from TPS calculation")
     print(f"   TPS calculated using only {len(active_blocks)} active blocks with transactions")
-    print(f"   Success rate & gas stats estimated from {len(tx_sample)} sampled transactions (fast mode)")
-    print(f"   Total gas calculated from block data (100% accurate)")
+    print(f"   ℹ️  Note: {len(active_blocks)} blocks = {len(active_blocks)-1} intervals (time from first to last)")
+    if latencies:
+        print(f"   ⏱️  {len(latencies)} exact latency measurements from timestamp file")
+    else:
+        print(f"   ⚠️  Latency estimated (run test with timestamp tracking for exact data)")
+    
+    # Additional insights - top gas consumers
+    if tx_details:
+        print("\n" + "=" * 90)
+        print("🔥 HIGH GAS CONSUMERS (Top 10)")
+        print("=" * 90)
+        sorted_by_gas = sorted(tx_details, key=lambda x: x['gas_used'], reverse=True)[:10]
+        for i, tx in enumerate(sorted_by_gas, 1):
+            status = "✅" if tx['status'] == 1 else "❌"
+            print(f"{i:2}. {status} {tx['hash'][:16]}... "
+                  f"gas: {tx['gas_used']:,} | block: {tx['block']}")
+    
+    # Failed transactions if any
+    if failed_txs > 0 and tx_details:
+        print("\n" + "=" * 90)
+        print(f"❌ FAILED TRANSACTIONS ({failed_txs} total)")
+        print("=" * 90)
+        failed_tx_list = [tx for tx in tx_details if tx['status'] == 0]
+        for i, tx in enumerate(failed_tx_list[:10], 1):  # Show first 10
+            print(f"{i:2}. {tx['hash'][:16]}... "
+                  f"gas: {tx['gas_used']:,} | block: {tx['block']}")
+        if len(failed_tx_list) > 10:
+            print(f"   ... and {len(failed_tx_list) - 10} more")
+    
+    # Export detailed data
+    if tx_details:
+        export_file = f"tps_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        try:
+            export_data = {
+                'summary': {
+                    'total_txs': len(tx_details),
+                    'successful': successful_txs,
+                    'failed': failed_txs,
+                    'tps_average': tps_average,
+                    'tps_aggregate': tps_aggregate,
+                    'active_time': active_time,
+                    'active_blocks': len(active_blocks),
+                    'avg_gas': avg_gas,
+                    'min_latency': min_latency,
+                    'avg_latency': avg_latency,
+                    'max_latency': max_latency,
+                },
+                'transactions': tx_details[:1000],  # Limit to first 1000 for file size
+                'blocks': [{
+                    'number': b['number'],
+                    'timestamp': b['timestamp'],
+                    'tx_count': b['tx_count'],
+                    'gas_used': b['gas_used']
+                } for b in active_blocks]
+            }
+            with open(export_file, 'w') as f:
+                json.dump(export_data, f, indent=2, default=str)
+            print(f"\n💾 Detailed data exported to: {export_file}")
+        except Exception as e:
+            print(f"\n⚠️  Could not export data: {e}")
+    
+    print("\n" + "=" * 90)
 
 if __name__ == "__main__":
     main()

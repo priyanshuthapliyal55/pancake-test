@@ -36,14 +36,14 @@ echo "📦 Installing OpenZeppelin contracts..."
 npm install --save @openzeppelin/contracts@^5.0.2 @openzeppelin/contracts-upgradeable@^5.0.2
 echo ""
 
-# Install and compile with Solc 0.8.20
-echo "📥 Installing Solc 0.8.20..."
-svm install 0.8.20 || true
+# Install and compile with Solc 0.8.22
+echo "📥 Installing Solc 0.8.22..."
+svm install 0.8.22 || true
 echo ""
 
 # Compile contracts
-echo "🔨 Compiling contracts with Solc 0.8.20..."
-forge build --use 0.8.20
+echo "🔨 Compiling contracts with Solc 0.8.22..."
+forge build --use 0.8.22
 echo ""
 
 if [ ! -f "out/Token.sol/Token.json" ]; then
